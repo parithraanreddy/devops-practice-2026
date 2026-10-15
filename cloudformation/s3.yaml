@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  DevOps practice - S3 static website
+
+Resources:
+
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+      Tags:
+        - Key: Name
+          Value: devops-practice-s3-website
+
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+
+      PolicyDocument:
+        Version: '2012-10-17'
+
+        Statement:
+          - Sid: PublicReadForWebsite
+
+            Effect: Allow
+
+            Principal: '*'
+
+            Action:
+              - s3:GetObject
+
+            Resource: !Sub '${WebsiteBucket.Arn}/*'
+
+
+Outputs:
+
+  BucketName:
+    Description: S3 website bucket name
+    Value: !Ref WebsiteBucket
+
+  WebsiteURL:
+    Description: S3 static website URL
+    Value: !GetAtt WebsiteBucket.WebsiteURL
