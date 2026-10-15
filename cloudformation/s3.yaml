@@ -1,11 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: >
-  DevOps practice - S3 static website
+Description: S3 static website
 
 Resources:
 
-    WebsiteBucket:
+  WebsiteBucket:
     Type: AWS::S3::Bucket
     Properties:
       WebsiteConfiguration:
@@ -21,8 +20,7 @@ Resources:
         - Key: Name
           Value: devops-practice-s3-website
 
-
-    WebsiteBucketPolicy:
+  WebsiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
       Bucket: !Ref WebsiteBucket
@@ -32,16 +30,11 @@ Resources:
 
         Statement:
           - Sid: PublicReadForWebsite
-
             Effect: Allow
-
             Principal: '*'
-
             Action:
               - s3:GetObject
-
             Resource: !Sub '${WebsiteBucket.Arn}/*'
-
 
 Outputs:
 
