@@ -5,11 +5,17 @@ Description: >
 
 Resources:
 
-  WebsiteBucket:
+    WebsiteBucket:
     Type: AWS::S3::Bucket
     Properties:
       WebsiteConfiguration:
         IndexDocument: index.html
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        IgnorePublicAcls: false
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
 
       Tags:
         - Key: Name
