@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  VPC and public EC2 web server
+
+Parameters:
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: my-key
+    Description: Existing EC2 key pair
+
+  MyIP:
+    Type: String
+    Description: public IP address in CIDR format
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    Description: EC2 instance type
+
+Resources:
+
+  # -------------------------
+  # VPC
+  # -------------------------
+
+  DevOpsVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: devops-practice-vpc
+
+
+  # -------------------------
+  # Internet Gateway
+  # -------------------------
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: devops-practice-igw
+
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref DevOpsVPC
+      InternetGatewayId: !Ref InternetGateway
+
+
+  # -------------------------
+  # Public Subnet
+  # -------------------------
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DevOpsVPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: ap-south-1a
+      Tags:
+        - Key: Name
+          Value: devops-public-subnet
+
+
+  # -------------------------
+  # Route Table
+  # -------------------------
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DevOpsVPC
+      Tags:
+        - Key: Name
+          Value: devops-public-route-table
+
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+
+  # -------------------------
+  # Security Group
+  # -------------------------
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH from my IP and HTTP from the internet
+      VpcId: !Ref DevOpsVPC
+
+      SecurityGroupIngress:
+
+        - Description: SSH from my IP
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyIP
+
+        - Description: HTTP from internet
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+      SecurityGroupEgress:
+
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+
+  # -------------------------
+  # EC2 Instance
+  # -------------------------
+
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+
+      ImageId: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+
+      KeyName: !Ref KeyName
+
+      SubnetId: !Ref PublicSubnet
+
+      SecurityGroupIds:
+        - !Ref WebSecurityGroup
+
+      Tags:
+        - Key: Name
+          Value: devops-practice-web-server
+
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+
+          dnf install -y nginx
+
+          systemctl enable nginx
+          systemctl start nginx
+
+          cat > /usr/share/nginx/html/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>DevOps Practice</title>
+          </head>
+          <body>
+              <h1>Hello from EC2!</h1>
+              <h2>Deployed using CloudFormation</h2>
+              <p>This website is running on Amazon Linux and Nginx.</p>
+          </body>
+          </html>
+          EOF
+
+
+Outputs:
+
+  VPCId:
+    Description: VPC ID
+    Value: !Ref DevOpsVPC
+
+  PublicSubnetId:
+    Description: Public subnet ID
+    Value: !Ref PublicSubnet
+
+  SecurityGroupId:
+    Description: Security group ID
+    Value: !Ref WebSecurityGroup
+
+  InstanceId:
+    Description: EC2 instance ID
+    Value: !Ref WebServer
+
+  PublicIP:
+    Description: Public IP of EC2
+    Value: !GetAtt WebServer.PublicIp
+
+  WebsiteURL:
+    Description: Website URL
+    Value: !Sub 'http://${WebServer.PublicIp}'
